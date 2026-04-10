@@ -7,6 +7,7 @@ Usage:
 """
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import List
@@ -37,8 +38,11 @@ def call_claude(prompt: str) -> str:
             pass  # anthropic not installed, fall back to CLI
     # Fallback: use claude CLI (handles desktop auth)
     try:
+        claude_path = shutil.which("claude")
+        if not claude_path:
+            raise RuntimeError("Claude CLI not found on PATH. Ensure it is installed and accessible.")
         result = subprocess.run(
-            ["claude", "--print"],
+            [claude_path, "--print"],
             input=prompt,
             text=True,
             capture_output=True,
@@ -63,7 +67,9 @@ STRICT RULES:
 Only compress natural language.
 
 TEXT:
+<document>
 {original}
+</document>
 """
 
 
@@ -102,6 +108,9 @@ Return ONLY the fixed compressed file. No explanation.
 def compress_file(filepath: Path) -> bool:
     # Resolve and validate path
     filepath = filepath.resolve()
+    cwd = Path.cwd()
+    if not filepath.is_relative_to(cwd):
+        raise ValueError("File must be within the current working directory")
     MAX_FILE_SIZE = 500_000  # 500KB
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
@@ -114,7 +123,7 @@ def compress_file(filepath: Path) -> bool:
         print("Skipping (not natural language)")
         return False
 
-    original_text = filepath.read_text(errors="ignore")
+    original_text = filepath.read_text(encoding="utf-8", errors="replace")
     backup_path = filepath.with_name(filepath.stem + ".original.md")
 
     # Check if backup already exists to prevent accidental overwriting
@@ -129,8 +138,8 @@ def compress_file(filepath: Path) -> bool:
     compressed = call_claude(build_compress_prompt(original_text))
 
     # Save original as backup, write compressed to original path
-    backup_path.write_text(original_text)
-    filepath.write_text(compressed)
+    backup_path.write_text(original_text, encoding="utf-8")
+    filepath.write_text(compressed, encoding="utf-8")
 
     # Step 2: Validate + Retry
     for attempt in range(MAX_RETRIES):
@@ -148,7 +157,7 @@ def compress_file(filepath: Path) -> bool:
 
         if attempt == MAX_RETRIES - 1:
             # Restore original on failure
-            filepath.write_text(original_text)
+            filepath.write_text(original_text, encoding="utf-8")
             backup_path.unlink(missing_ok=True)
             print("❌ Failed after retries — original restored")
             return False
@@ -157,6 +166,6 @@ def compress_file(filepath: Path) -> bool:
         compressed = call_claude(
             build_fix_prompt(original_text, compressed, result.errors)
         )
-        filepath.write_text(compressed)
+        filepath.write_text(compressed, encoding="utf-8")
 
     return True
