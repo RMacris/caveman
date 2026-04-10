@@ -2,17 +2,15 @@
 # caveman — one-command hook installer for Claude Code
 # Installs: SessionStart hook (auto-load rules) + UserPromptSubmit hook (mode tracking)
 # Usage: bash hooks/install.sh
-#   or:  bash <(curl -s https://raw.githubusercontent.com/JuliusBrussee/caveman/main/hooks/install.sh)
 set -e
 
 CLAUDE_DIR="$HOME/.claude"
 HOOKS_DIR="$CLAUDE_DIR/hooks"
 SETTINGS="$CLAUDE_DIR/settings.json"
-REPO_URL="https://raw.githubusercontent.com/JuliusBrussee/caveman/main/hooks"
 
 HOOK_FILES=("caveman-activate.js" "caveman-mode-tracker.js")
 
-# Resolve source — works from repo clone or curl pipe
+# Resolve source directory (script must be run from inside the cloned repo)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}" 2>/dev/null)" 2>/dev/null && pwd)"
 
 echo "Installing caveman hooks..."
@@ -20,12 +18,14 @@ echo "Installing caveman hooks..."
 # 1. Ensure hooks dir exists
 mkdir -p "$HOOKS_DIR"
 
-# 2. Copy or download hook files
+# 2. Copy hook files (must be run from inside the cloned repo)
 for hook in "${HOOK_FILES[@]}"; do
   if [ -f "$SCRIPT_DIR/$hook" ]; then
     cp "$SCRIPT_DIR/$hook" "$HOOKS_DIR/$hook"
   else
-    curl -fsSL "$REPO_URL/$hook" -o "$HOOKS_DIR/$hook"
+    echo "❌ Hook file not found: $SCRIPT_DIR/$hook"
+    echo "   Run this script from inside the cloned RMacris/caveman repo."
+    exit 1
   fi
   echo "  Installed: $HOOKS_DIR/$hook"
 done
@@ -85,4 +85,4 @@ echo "  - Mode tracker hook: updates statusline badge when you switch modes"
 echo "    (/caveman lite, /caveman ultra, /caveman-commit, etc.)"
 echo ""
 echo "Optional: Add a [CAVEMAN] badge to your statusline."
-echo "See: https://github.com/JuliusBrussee/caveman/blob/main/hooks/README.md"
+echo "See: https://github.com/RMacris/caveman/blob/main/hooks/README.md"
